@@ -1,0 +1,20 @@
+# Specifies intentionally untracked files to ignore when using Git
+# http://git-scm.com/docs/gitignore
+
+node_modules/
+platforms/
+!/www/js/config/platforms
+plugins/
+.idea/
+www/lib
+www/js/bundles
+www/.tmp
+build/config.gypi
+# Logs #
+*.log
+.tmp/
+
+# OS generated files #
+.DS_Store*
+ehthumbs.db
+Thumbs.db
