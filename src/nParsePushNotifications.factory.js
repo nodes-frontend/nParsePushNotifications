@@ -268,8 +268,6 @@
 
 		/**
 		 * Unsubscribes specified channel by updating channels at Parse.com
-		 * Beware that the broadcast will still be subscribed
-		 * To totally disable push notifications use the unregister method
 		 * @param channel
 		 * @returns a promise
 		 */
@@ -302,6 +300,8 @@
 
 		/**
 		 * Unsubscribes all channels at Parse.com
+		 * Beware that the broadcast will still be subscribed
+		 * To totally disable push notifications use the unregister method
 		 * @returns a promise
 		 */
 		function unsubscribeAll() {
