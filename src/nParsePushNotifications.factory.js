@@ -18,7 +18,8 @@
 			hasPermission					: hasPermission,
 			setApplicationBadgeNumberIOS	: setApplicationBadgeNumberIOS,
 			subscribe						: subscribe,
-			unsubscribe						: unsubscribe
+			unsubscribe						: unsubscribe,
+			unsubscribeAll					: unsubscribeAll
 		};
 
 		/**
@@ -45,25 +46,38 @@
 		function init() {
 			var deferred = $q.defer();
 
+			/**
+			 * Sets instance to the promise until PushNotification is initialized
+			 * so it can be referenced by other functions like subscribe
+			 * @type a promise
+			 */
 			$ionicPlatform.ready(function deviceReady() {
 
 				if($window.PushNotification) {
-					instance = $window.PushNotification.init(config);
 
-					instance.on('registration', function registration(data) {
+					var PushNotification = window.PushNotification.init(config);
+
+					PushNotification.on('registration', function registration(data) {
 						config.parse.deviceToken = data.registrationId;
 
-						_uploadParseInstallation().then(function uploadedParseInstallationSuccess(response) {
-							deferred.resolve(response);
+						_uploadParseInstallation().then(function uploadedParseInstallationSuccess() {
+							deferred.resolve(PushNotification);
 						}).catch(function uploadedParseInstallationCatch(response) {
 							deferred.reject(response);
 						});
 					});
 
-					instance.on('notification', function notification(notification) {
-						$rootScope.$emit('$cordovaPush:notificationReceived', notification);
+					PushNotification.on('notification', function notification(data) {
+						$rootScope.$emit('$cordovaPush:notificationReceived', data);
+
+						/**
+						 * Tells the OS that you are done processing a background push notification.
+						 */
+						setTimeout(function() {
+							PushNotification.finish();
+						}, 30000);
 					});
-					instance.on('error', function notificationError(error) {
+					PushNotification.on('error', function notificationError(error) {
 						$rootScope.$emit('$cordovaPush:errorOccurred', error);
 					});
 
@@ -72,6 +86,7 @@
 				}
 			});
 
+			instance = deferred.promise;
 			return deferred.promise;
 		}
 
@@ -84,7 +99,6 @@
 			var deferred = $q.defer(),
 				parse    = config.parse,
 				reqData  = {
-					channels	: parse.channels,
 					deviceType	: parse.deviceType,
 					deviceToken : parse.deviceToken,
 					pushType	: parse.pushType,
@@ -129,7 +143,7 @@
 					GCMSenderId : parse.GCMSenderId
 				};
 
-			if(parse.objectID) {
+			instance.then(function instanceSuccess() {
 
 				$http.put(parse.endpoint + '/' + parse.objectID, reqData, {
 						"headers": {
@@ -147,11 +161,23 @@
 					.error(function updateParseInstallationCatch(response, status) {
 						deferred.reject('Oops! Something went wrong', response, status);
 					});
-			} else {
-				deferred.reject('PUSH NOT INIT');
-			}
+
+			}).catch(function instanceCatch(error) {
+				deferred.reject(error);
+			});
 
 			return deferred.promise;
+		}
+
+		/**
+		 * Checks if item is in array
+		 * @param array
+		 * @param item
+		 * @returns {boolean}
+		 * @private
+		 */
+		function _inArray(array, item) {
+			return array.indexOf(item) >= 0;
 		}
 
 		/**
@@ -163,11 +189,15 @@
 		function unregister() {
 			var deferred = $q.defer();
 
-			instance.unregister(function unregisterSuccess() {
-				deferred.resolve(true);
-			}, function unregisterCatch() {
-				deferred.reject('Oops! Something went wrong');
+			instance.then(function instanceSuccess(PushNotification) {
+				PushNotification.unregister(function unregisterSuccess() {
+					deferred.resolve(true);
+				}, function unregisterCatch() {
+					deferred.reject('Oops! Something went wrong');
+				});
 			});
+
+			deferred.resolve(true);
 
 			return deferred.promise;
 		}
@@ -214,22 +244,32 @@
 			var deferred = $q.defer(),
 				parse    = config.parse;
 
-			if(instance) {
-				parse.channels[parse.channels.length] = channel;
-				_updateParseInstallation().then(function updateParseInstallationSuccess(response) {
-					deferred.resolve(response);
-				}).catch(function updateParseInstallationCatch(response) {
-					deferred.reject(response);
-				});
-			} else {
-				deferred.reject('Oops! Something went wrong: PushNotification does not seem to be initialized!');
-			}
+			instance.then(function instanceSuccess() {
+
+				if( !_inArray(parse.channels, channel) ) {
+
+					parse.channels[parse.channels.length] = channel;
+
+					_updateParseInstallation().then(function updateParseInstallationSuccess() {
+						deferred.resolve(parse.channels);
+					}).catch(function updateParseInstallationCatch(error) {
+						deferred.reject(error);
+					});
+				} else {
+					deferred.resolve('Specified channel is already subcribed');
+				}
+
+			}).catch(function instanceCatch(error) {
+				deferred.reject(error);
+			});
 
 			return deferred.promise;
 		}
 
 		/**
 		 * Unsubscribes specified channel by updating channels at Parse.com
+		 * Beware that the broadcast will still be subscribed
+		 * To totally disable push notifications use the unregister method
 		 * @param channel
 		 * @returns a promise
 		 */
@@ -237,21 +277,50 @@
 			var deferred = $q.defer(),
 				parse 	 = config.parse;
 
-			if(instance) {
-				const index = parse.channels.indexOf(channel);
+			instance.then(function instanceSuccess() {
+
+				var index = parse.channels.indexOf(channel);
 				if(index >= 0) {
+
 					parse.channels.splice(index, 1);
-					_updateParseInstallation().then(function updateParseInstallationSuccess(response) {
-						deferred.resolve(response);
-					}).catch(function updateParseInstallationCatch() {
-						deferred.reject(response);
+
+					_updateParseInstallation().then(function updateParseInstallationSuccess() {
+						deferred.resolve(parse.channels);
+					}).catch(function updateParseInstallationCatch(error) {
+						deferred.reject(error);
 					});
 				} else {
 					deferred.reject('Oops! Something went wrong: Channel does not seem to be subscribed');
 				}
-			} else {
-				deferred.reject('Oops! Something went wrong: PushNotification does not seem to be initialized!');
-			}
+
+			}).catch(function instanceCatch(error) {
+				deferred.reject(error);
+			});
+
+			return deferred.promise;
+		}
+
+		/**
+		 * Unsubscribes all channels at Parse.com
+		 * @returns a promise
+		 */
+		function unsubscribeAll() {
+			var deferred = $q.defer(),
+				parse 	 = config.parse;
+
+			instance.then(function instanceSuccess() {
+
+				parse.channels = [];
+
+				_updateParseInstallation().then(function updateParseInstallationSuccess() {
+					deferred.resolve(parse.channels);
+				}).catch(function updateParseInstallationCatch(error) {
+					deferred.reject(error);
+				});
+
+			}).catch(function instanceCatch(error) {
+				deferred.reject(error);
+			});
 
 			return deferred.promise;
 		}

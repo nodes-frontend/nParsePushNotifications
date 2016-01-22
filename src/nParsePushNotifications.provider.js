@@ -72,7 +72,7 @@
 				/**
 				 * Channels for Parse.com
 				 */
-				channels			: [""]
+				channels			: []
 			}
 		};
 
