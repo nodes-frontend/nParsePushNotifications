@@ -35,7 +35,6 @@ nParsePushNotifications.init().then(function() {
 nParsePushNotifications.subscribe('CHANNEL').then(function(channels) {
     // Do something
 });
-});
 ```
 
 ## Unsubscribe channel
@@ -48,7 +47,9 @@ nParsePushNotifications.unsubscibe('CHANNEL').then(function(channels) {
 ## Unsubscribe all channels
 Beware that this doesn't unsubscribe the broadcast channel. If you wanna disable push notifications entirely, you should you the unregister method.
 ```javascript
-nParsePushNotifications.unsubcribeAll();
+nParsePushNotifications.unsubcribeAll().then(function(channels) {
+    // Do something
+});
 ```
 
 ## Unregister push notifications
