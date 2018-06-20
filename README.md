@@ -1,5 +1,6 @@
-# ⛔️ [DEPRECATED] nParsePushNotifications
----
+# nParsePushNotifications
+_Not maintained by Nodes anymore_
+
 Angular wrapper for push notifications with [phonegap/phonegap-plugin-push](https://github.com/phonegap/phonegap-plugin-push) using Parse.com
 
 ## Configuration
